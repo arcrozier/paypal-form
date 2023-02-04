@@ -1,0 +1,151 @@
+<script src="https://www.paypal.com/sdk/js?client-id=AeFU6K098kQ353VXj_lnWT-N_ytY3wnIDsOmLoOipmm2Xbs1AtAlhcVxsuOEfNs5E1sLpBXjkCwxS31N&currency=USD"></script>
+<!-- Test client-id=Adt6MX1DaYwmomMKl4TqSslzV2QuebsgvEZA2e4guQPqj_Z-5rlxHasG2i0G-DbMzO5nokWUu3_PVxD7 -->
+<!-- Production client-id=AeFU6K098kQ353VXj_lnWT-N_ytY3wnIDsOmLoOipmm2Xbs1AtAlhcVxsuOEfNs5E1sLpBXjkCwxS31N -->
+<!-- Set up a container element for the button -->
+<div id="payment-box">
+    <!-- Adding some styling might be nice; pretty ugly right now -->
+    <form>
+        <div>
+            <label for="phoneNumber">Phone number</label>
+            <input id="phoneNumber" type="tel" name="phone">
+        </div>
+        <div>
+            <label for="adultInput">Number of adults</label>
+            <input id="adultInput" type="number" name="adults">
+        </div>
+        <div>
+            <label for="childrenInput">Number of current UW students or children under
+                16</label>
+            <input id="childrenInput" type="number" name="children">
+        </div>
+        <div>
+            <label for="details">Dietary restrictions</label>
+            <input id="details" type="text">
+        </div>
+    </form>
+    <div id="paypal-button-container"></div>
+</div>
+
+<script>
+    const ADULT_PRICE = 20
+    const CHILD_PRICE = 15
+    const AUCTION_DATE = 'February 19th'
+
+    let phoneNumber;
+    let details;
+
+    const phone = document.getElementById("phoneNumber");
+    phone.onblur((ev) => {
+        
+        const input = ev.target.value.replace(/\D/g,'').substring(0,10); // First ten digits of input only
+        const areaCode = input.substring(0,3);
+        const middle = input.substring(3,6);
+        const last = input.substring(6,10);
+
+        if(input.length > 6){ev.target.value = `(${areaCode}) ${middle} - ${last}`;}
+        else if(input.length > 3){ev.target.value = `(${areaCode}) ${middle}`;}
+        else if(input.length > 0){ev.target.value = `(${areaCode}`;}
+    })
+
+    paypal.Buttons({
+
+        // Sets up the transaction when a payment button is clicked
+        createOrder: function (data, actions) {
+            let adultsText = document.getElementById("adultInput").value;
+            let childrenText = document.getElementById("childrenInput").value;
+            let numAdults = parseInt(adultsText === "" ? '0' : adultsText);
+            let numChildren = parseInt(childrenText === "" ? '0' : childrenText);
+
+            if (!/^[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]{4,6}$/im.test(phone.value)) {
+                alert("Please enter a valid phone number")
+                return false
+            }
+            phoneNumber = phone.value
+            details = document.getElementById("details").value
+
+            if (isNaN(numAdults) || numAdults < 0) {
+                alert("Please enter a number of adults greater than or equal to 0")
+                return false;
+            }
+            if (isNaN(numChildren) || numChildren < 0) {
+                alert("Please enter a number of children greater than or equal to 0");
+                return false;
+            }
+            if (numAdults + numChildren < 1) {
+                alert("Please pay for at least one person?");
+                return false;
+            }
+            let items = [];
+            if (numAdults > 0) {
+                items.push({
+                        "name": "Adults",
+                        "unit_amount": {
+                            "currency_code": "USD",
+                            "value": ADULT_PRICE.toString()
+                        },
+                        "quantity": `${numAdults}`
+                    },
+                )
+            }
+            if (numChildren > 0) {
+                items.push({
+                    "name": "Children",
+                    "description": "Current UW students or children under 16",
+                    "unit_amount": {
+                        "currency_code": "USD",
+                        "value": CHILD_PRICE.toString()
+                    },
+                    "quantity": `${numChildren}`
+                },)
+            }
+            return actions.order.create({
+                "purchase_units": [{
+                    "amount": {
+                        "currency_code": "USD",
+                        "value": `${numChildren * CHILD_PRICE + numAdults * ADULT_PRICE}`,
+                        "breakdown": {
+                            "item_total": {
+                                "currency_code": "USD",
+                                "value": `${numChildren * CHILD_PRICE + numAdults * ADULT_PRICE}`
+                            }
+                        }
+                    },
+                    "items": items
+                }]
+
+            });
+        },
+
+        // Finalize the transaction after payer approval
+        onApprove: function (data, actions) {
+            return actions.order.capture().then(function (orderData) {
+                // includes name, email, address
+                let payer = orderData.payer
+                // includes what they bought
+                let bought = orderData.purchase_units
+                // both are visible from the PayPal screen
+                
+                // THE DETAILS AND PHONE NUMBER ARE NOT PROVIDED TO PAYPAL
+                // IF YOU WANT TO COLLECT THESE DATA, YOU NEED TO SEND THEM SOMEWHERE ELSE
+                // can use details variable and phone variable 
+                
+                // Might want to make a request to an RSVP endpoint to collect this other info
+
+                let element = document.getElementById('paypal-button-container');
+                element.innerHTML =
+                    '<h3 style="color: green; text-align: center"><b>Thank you for supporting the Husky Sailing Team!</b></h3>' +
+                    '<div style="text-align: center">' +
+                    'We\'ve received your payment and we\'re looking forward to ' +
+                    `seeing you on ${AUCTION_DATE}!` +
+                    '</div>';
+                element.style.backgroundColor = 'rgba(0, 137, 34, 0.25)'
+                element.style.paddingTop = '1px'
+                element.style.paddingBottom = '20px'
+                element.style.paddingRight = '20px'
+                element.style.paddingLeft = '20px'
+                element.style.borderRadius = '5px'
+            });
+        }
+    }).render('#paypal-button-container');
+
+</script>
